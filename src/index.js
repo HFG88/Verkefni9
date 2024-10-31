@@ -5,6 +5,7 @@
 
 import { el } from './lib/elements.js';
 import { weatherSearch } from './lib/weather.js';
+import {empty} from './lib/elements.js';
 
 /**
  * @typedef {Object} SearchLocation
@@ -50,8 +51,18 @@ const locations = [
  * @param {Element} element
  */
 function renderIntoResultsContent(element) {
-  // TODO útfæra
+  const outputElement = document.querySelector('.output');
+
+  if (!outputElement) {
+    console.warn('fann ekki .output');
+    return;
+  }
+
+  empty(outputElement);
+
+  outputElement.appendChild(element);
 }
+
 
 /**
  * Birtir niðurstöður í viðmóti.
@@ -59,7 +70,25 @@ function renderIntoResultsContent(element) {
  * @param {Array<import('./lib/weather.js').Forecast>} results
  */
 function renderResults(location, results) {
-  // TODO útfæra
+  const header = el('tr', {}, el('th', {}, 'Klukkustund'), el('th', {}, 'Hitastig (°C)'),  el('th', {}, 'Úrkoma (mm)'));
+  console.log(results);
+  const outputElement = el('tr', {}, el('th', {}, 'Tími'), el('th', {}, 'Hiti'),  el('th', {}, 'Úrkoma'));
+  const resultsTable = el('table', { class: 'forecast' }, header, outputElement);
+  const resultsTableBody = el('tbody', {});
+  
+  
+   results.forEach((lina) => {
+    const timi = new Date(lina.time);
+    const timiRettur = `${timi.getHours().toString().padStart(2, '0')}:${timi.getMinutes().toString().padStart(2, '0')}`;
+     const body = el('tr', {}, el('td', {}, timiRettur), el('td', {}, `${lina.temperature}`), el('td', {}, `${lina.precipitation}`));
+     resultsTableBody.appendChild(body);
+    });
+    resultsTable.appendChild(resultsTableBody);
+
+
+
+    renderIntoResultsContent(el('section', {}, el('h1', {}, 'Niðurstöður'), el('h2', {}, `${location.title}`), resultsTable));  
+  
 }
 
 /**
@@ -67,15 +96,16 @@ function renderResults(location, results) {
  * @param {Error} error
  */
 function renderError(error) {
-  // TODO útfæra
+  console.log(error);
+  const message = error.message;
+  renderIntoResultsContent(el('p', {}, `Villa: ${message}`));
 }
 
 /**
  * Birta biðstöðu í viðmóti.
  */
 function renderLoading() {
-  console.log('render loading');
-  // TODO útfæra
+  renderIntoResultsContent(el('p', {}, 'Leita...'));
 }
 
 /**
@@ -84,14 +114,18 @@ function renderLoading() {
  * @param {SearchLocation} location Staðsetning sem á að leita eftir.
  */
 async function onSearch(location) {
-  console.log('onSearch', location);
-
-  // Birta loading state
   renderLoading();
 
-  const results = await weatherSearch(location.lat, location.lng);
+  let results;
+  try {
+    results = await weatherSearch(location.lat, location.lng); 
+  } catch (error) {
+    renderError(error);
+    return;
+  }
 
-  console.log(results);
+  renderResults(location, results ?? []);
+
   // TODO útfæra
   // Hér ætti að birta og taka tillit til mismunandi staða meðan leitað er.
 }
@@ -101,7 +135,12 @@ async function onSearch(location) {
  * Biður notanda um leyfi gegnum vafra.
  */
 async function onSearchMyLocation() {
-  // TODO útfæra
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {const {latitude, longitude} = position.coords;
+    const location = {title: 'Mín staðsetning', lat: latitude, lng: longitude};
+    onSearch(location);
+  }, () => renderError(new Error('Gat ekki fundið staðsetningu'))
+)
 }
 
 /**
@@ -149,11 +188,15 @@ function render(container, locations, onSearch, onSearchMyLocation) {
   // Búum til <header> með beinum DOM aðgerðum
   const headerElement = document.createElement('header');
   const heading = document.createElement('h1');
-  heading.appendChild(document.createTextNode('<fyrirsögn>'));
+  heading.appendChild(document.createTextNode('Veðrið í dag'));
   headerElement.appendChild(heading);
   parentElement.appendChild(headerElement);
 
-  // TODO útfæra inngangstexta
+  // DIDDO útfæra inngangstexta
+  const inngangsElement = document.createElement('p');
+  inngangsElement.appendChild(document.createTextNode('Veldu stað til að sjá hita- og úrkomuspá.'));
+  headerElement.appendChild(inngangsElement);
+  
   // Búa til <div class="loctions">
   const locationsElement = document.createElement('div');
   locationsElement.classList.add('locations');
@@ -162,21 +205,25 @@ function render(container, locations, onSearch, onSearchMyLocation) {
   const locationsListElement = document.createElement('ul');
   locationsListElement.classList.add('locations__list');
 
+
+
   // <div class="loctions"><ul class="locations__list"></ul></div>
   locationsElement.appendChild(locationsListElement);
 
+  locationsListElement.appendChild(renderLocationButton('Mín staðsetning', onSearchMyLocation));
+
   // <div class="loctions"><ul class="locations__list"><li><li><li></ul></div>
   for (const location of locations) {
-    const liButtonElement = renderLocationButton(location.title, () => {
-      console.log('Halló!!', location);
-      onSearch(location);
-    });
+    const liButtonElement = renderLocationButton(location.title, () => { console.log('Halló!!', location); onSearch(location); } );
     locationsListElement.appendChild(liButtonElement);
   }
 
   parentElement.appendChild(locationsElement);
 
   // TODO útfæra niðurstöðu element
+  const outputElement = document.createElement('div');
+  outputElement.classList.add('output');
+  parentElement.appendChild(outputElement);
 
   container.appendChild(parentElement);
 }
